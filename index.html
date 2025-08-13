@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drosera Network Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #ff6600;
+  --wrong: #ff4d4d;
+  --correct: #4caf50;
+  --bg: #0f0f0f;
+  --text: #ffffff;
+}
+
+body {
+  margin:0; 
+  font-family: 'Montserrat', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  min-height:100vh; 
+  padding:20px;
+  overflow: hidden;
+}
+
+/* Subtle animated scanline background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    rgba(255,255,255,0.02) 0px,
+    rgba(255,255,255,0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: scanline 10s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes scanline {
+  from { background-position: 0 0; }
+  to { background-position: 0 100px; }
+}
+
+#app { 
+  width:100%; 
+  max-width:480px; 
+  position: relative;
+  z-index: 1;
+}
+
+/* Glitch text effect for title */
+h1 {
+  margin-bottom:10px; 
+  font-weight:700; 
+  color: var(--accent);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  position: relative;
+  animation: glitch 1s infinite;
+}
+
+@keyframes glitch {
+  0% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  20% { text-shadow: -2px 0 red, 2px 0 cyan; }
+  40% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  60% { text-shadow: -2px 0 red, 2px 0 cyan; }
+  80% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  100% { text-shadow: -2px 0 red, 2px 0 cyan; }
+}
+
+.screen { display:none; text-align:center; }
+.screen.active { display:block; animation: fadeIn 0.5s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* HUD-style buttons */
+.btn {
+  padding:12px 18px; 
+  border:none; 
+  border-radius:8px; 
+  font-size:1rem; 
+  font-weight:600;
+  margin-top:12px; 
+  background:var(--accent); 
+  color:white; 
+  width:100%;
+  cursor:pointer;
+  box-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px var(--accent), 0 0 30px var(--accent);
+}
+
+input {
+  padding: 12px 18px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #333;
+  font-size: 1rem;
+  margin-top: 10px;
+  background: #1a1a1a;
+  color: white;
+  box-sizing: border-box;
+}
+
+#meta { 
+  display:flex; 
+  justify-content:space-between; 
+  margin-bottom:8px; 
+  font-size:0.9rem; 
+}
+
+/* Scanning energy beam progress */
+#progress {
+  height:12px; 
+  background:#333; 
+  border-radius:8px; 
+  margin-bottom:16px; 
+  overflow:hidden;
+  position: relative;
+}
+#progress-bar { 
+  height:100%; 
+  width:0%; 
+  background: linear-gradient(90deg, var(--accent), #ff9900);
+  box-shadow: 0 0 10px var(--accent);
+  transition:width 0.3s; 
+}
+
+.question { font-size:1.1rem; margin:12px 0 20px; }
+.options { display:flex; flex-direction:column; gap:10px; }
+.option {
+  padding:12px; 
+  border-radius:8px; 
+  border:2px solid transparent; 
+  background:var(--accent);
+  text-align:left; 
+  font-weight:600; 
+  transition: background 0.2s, border 0.2s, transform 0.1s;
+  cursor:pointer;
+  color: black;
+}
+.option:hover {
+  transform: scale(1.02);
+}
+.option.correct { background:#1e4620; border-color:var(--correct); color: #fff; }
+.option.wrong { background:#4a1a1a; border-color:var(--wrong); color: #fff; }
+
+/* Mission complete stamp */
+#finalScore {
+  font-size: 1.2rem;
+  margin-top: 15px;
+  padding: 10px;
+  display: inline-block;
+  border: 3px solid var(--accent);
+  position: relative;
+  animation: stamp 0.6s ease-out forwards;
+}
+@keyframes stamp {
+  0% { transform: scale(3) rotate(-10deg); opacity: 0; }
+  100% { transform: scale(1) rotate(-5deg); opacity: 1; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- START SCREEN -->
+  <div id="start-screen" class="screen active">
+  <h1>Drosera Network Quiz</h1>
+  <input type="text" id="playerName" placeholder="Enter your callsign" required>
+  <button class="btn" id="startBtn" disabled>Initiate Mission</button>
+</div>
+
+  <!-- QUIZ SCREEN -->
+  <div id="quiz-screen" class="screen">
+    <div id="meta">
+      <span id="displayName"></span>
+      <span id="scoreDisplay">Score: 0</span>
+      <span id="timer">10:00</span>
+    </div>
+    <div id="progress"><div id="progress-bar"></div></div>
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div id="result-screen" class="screen">
+    <h1>Mission Complete</h1>
+    <p id="finalScore"></p>
+    <button class="btn" id="playAgainBtn">Restart Mission</button>
+  </div>
+</div>
+
+<script>
+const questions = [
+  // Section 1 — Why Drosera
+  { q: "Why was Drosera created?", o: ["To automate blockchain security responses proactively", "To make NFTs", "To launch a memecoin", "To build DeFi DEXs"], a: 0 },
+  { q: "What makes Drosera different from traditional audits?", o: ["Proactive detection and automatic response", "Only runs yearly audits", "Focuses on fashion NFTs", "Relies solely on manual code review"], a: 0 },
+
+  // Section 2 — Traps & Operators
+  { q: "What is a 'Trap' in Drosera?", o: ["A smart contract + off-chain logic to detect threats", "A phishing scam", "A token airdrop", "A Discord bot"], a: 0 },
+  { q: "Who runs Traps and triggers responses?", o: ["Operators", "NFT Holders", "Gas Miners", "Validators"], a: 0 },
+  { q: "What consensus threshold must Operators reach to execute a response?", o: ["At least two-thirds", "51%", "100%", "One operator only"], a: 0 },
+  { q: "What happens if an Operator misbehaves?", o: ["They can be slashed", "They get promoted", "Nothing", "They receive extra rewards"], a: 0 },
+  { q: "Are Traps limited in number?", o: ["No, they can be created freely", "Yes, only 100 exist", "Yes, based on staking tier", "Only Drosera creates them"], a: 0 },
+
+  // Section 3 — Incentives & Economics
+  { q: "What is a Hydration Stream?", o: ["A continuous reward stream for Operators", "A water pipeline", "A video streaming service", "An NFT mint"], a: 0 },
+  { q: "What is a Bloom Boost?", o: ["An ETH deposit to prioritize emergency responses", "A Discord role", "A staking token", "A gas fee rebate"], a: 0 },
+  { q: "What is the reward split for Operators?", o: ["70% passive, 20% active, 10% staking pool", "50/50 split", "100% to the first operator", "90% passive, 10% admin"], a: 0 },
+
+  // Section 4 — Network Migration
+  { q: "Drosera migrated from which testnet to Hoodi?", o: ["Holesky", "Goerli", "Sepolia", "Mumbai"], a: 0 },
+  { q: "Is Holesky still in use for Drosera?", o: ["No, it's deprecated", "Yes, fully active", "Only for NFTs", "Only for Discord"], a: 0 },
+
+  // Section 5 — Developer Tools & Workshops
+  { q: "What command is used to set up Drosera locally?", o: ["droseraup", "npm install drosera", "yarn start", "forge deploy"], a: 0 },
+  { q: "What tool does Drosera offer for learning Trap building?", o: ["Trap Workshop", "Tokenomics 101", "NFT Academy", "Gas Saver"], a: 0 },
+
+  // Section 6 — Community & Social Layer
+  { q: "What is the highest individual role in Drosera?", o: ["Droseran Ambassador", "Droseran Domain", "Janissary Keeper", "Traplord"], a: 0 },
+  { q: "What is the highest team/collective role path in Drosera?", o: ["Janissary Army", "Hoodi Guard", "Operator Council", "Trap Builders"], a: 0 },
+  { q: "What is the Droseran Janissary Army?", o: ["A community role system with paths like Trapper, Artist, Writer", "A PvP game mode", "A staking pool", "An NFT collection"], a: 0 },
+  { q: "Who can join the Janissary Army?", o: ["Any community member", "Only Operators", "Only Devs", "Only people with 100 $ETH"], a: 0 },
+  { q: "What is the highest regional community role in Drosera?", o: ["Drosera Regional Head of Community", "Janissary Captain", "Traplord", "Operator Supreme"], a: 0 },
+
+  // Section 7 — Team Accuracy
+  { q: "Who is the founder of Drosera?", o: ["Fernando Reyes Jr.", "Vitalik Buterin", "Emin Gün Sirer", "Charles Hoskinson"], a: 0 },
+  { q: "Who is a co-founder of Drosera?", o: ["Samuel “Boba” Glenn", "Gavin Wood", "Anatoly Yakovenko", "Hayden Adams"], a: 0 },
+  { q: "Who is another core team member of Drosera?", o: ["Jacob “Kratos” Veal", "Satoshi Nakamoto", "Andreas Antonopoulos", "Justin Sun"], a: 0 },
+
+  // Section 8 — Extra details
+  { q: "What cryptography do Operators use to sign claims?", o: ["BLS signatures", "RSA keys", "Quantum encryption", "SHA-1"], a: 0 },
+  { q: "What is Drosera’s core mission?", o: ["Securing Web3 through automated threat detection & on-chain response", "Launching memecoins", "Selling NFTs", "Replacing L1 blockchains"], a: 0 }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let playerName = "";
+
+const startScreen = document.getElementById("start-screen");
+const quizScreen = document.getElementById("quiz-screen");
+const resultScreen = document.getElementById("result-screen");
+const playerNameInput = document.getElementById("playerName");
+const displayName = document.getElementById("displayName");
+const scoreDisplay = document.getElementById("scoreDisplay");
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const finalScore = document.getElementById("finalScore");
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  if (playerNameInput.value.trim() === "") {
+    alert("Please enter your name to start.");
+    return;
+  }
+  playerName = playerNameInput.value.trim();
+  displayName.textContent = playerName;
+  score = 0;
+  currentQuestion = 0;
+  scoreDisplay.textContent = `Score: ${score}`;
+  showScreen("quiz-screen");
+  loadQuestion();
+});
+
+document.getElementById("playAgainBtn").addEventListener("click", () => {
+  showScreen("start-screen");
+});
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+function shuffleArray(array) {
+  return array
+    .map(value => ({ value, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ value }) => value);
+}
+
+function loadQuestion() {
+  let q = questions[currentQuestion];
+  questionEl.textContent = q.q;
+
+  // Shuffle options
+  const optionIndexes = q.o.map((opt, idx) => idx);
+  const shuffledIndexes = shuffleArray(optionIndexes);
+
+  // Find where the correct answer ended up
+  const correctShuffledIndex = shuffledIndexes.indexOf(q.a);
+
+  optionsEl.innerHTML = "";
+  shuffledIndexes.forEach((originalIdx, displayIdx) => {
+    let btn = document.createElement("button");
+    btn.classList.add("option");
+    btn.textContent = q.o[originalIdx];
+    btn.addEventListener("click", () => selectOption(displayIdx, correctShuffledIndex));
+    optionsEl.appendChild(btn);
+  });
+
+  updateProgress();
+}
+
+function selectOption(selectedIndex, correctIndex) {
+  const optionButtons = document.querySelectorAll(".option");
+  optionButtons.forEach((btn, idx) => {
+    if (idx === correctIndex) btn.classList.add("correct");
+    else if (idx === selectedIndex) btn.classList.add("wrong");
+    btn.disabled = true;
+  });
+  if (selectedIndex === correctIndex) {
+    score++;
+    scoreDisplay.textContent = `Score: ${score}`;
+  }
+  setTimeout(nextQuestion, 800);
+}
+
+function nextQuestion() {
+  currentQuestion++;
+  if (currentQuestion < questions.length) {
+    loadQuestion();
+  } else {
+    finalScore.textContent = `${playerName}, you scored ${score} out of ${questions.length}!`;
+    showScreen("result-screen");
+  }
+}
+
+function updateProgress() {
+  let percent = ((currentQuestion) / questions.length) * 100;
+  progressBar.style.width = percent + "%";
+}
+</script>
+</body>
+</html>
