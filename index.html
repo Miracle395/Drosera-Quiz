@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drosera Network Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #ff6600;
+  --wrong: #ff4d4d;
+  --correct: #4caf50;
+  --bg: #0f0f0f;
+  --text: #ffffff;
+}
+
+body {
+  margin:0; 
+  font-family: 'Montserrat', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  min-height:100vh; 
+  padding:20px;
+  overflow: hidden;
+}
+
+/* Subtle animated scanline background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    rgba(255,255,255,0.02) 0px,
+    rgba(255,255,255,0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: scanline 10s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes scanline {
+  from { background-position: 0 0; }
+  to { background-position: 0 100px; }
+}
+
+#app { 
+  width:100%; 
+  max-width:480px; 
+  position: relative;
+  z-index: 1;
+}
+
+/* Glitch text effect for title */
+h1 {
+  margin-bottom:10px; 
+  font-weight:700; 
+  color: var(--accent);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  position: relative;
+  animation: glitch 1s infinite;
+}
+
+@keyframes glitch {
+  0% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  20% { text-shadow: -2px 0 red, 2px 0 cyan; }
+  40% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  60% { text-shadow: -2px 0 red, 2px 0 cyan; }
+  80% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  100% { text-shadow: -2px 0 red, 2px 0 cyan; }
+}
+
+.screen { display:none; text-align:center; }
+.screen.active { display:block; animation: fadeIn 0.5s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* HUD-style buttons */
+.btn {
+  padding:12px 18px; 
+  border:none; 
+  border-radius:8px; 
+  font-size:1rem; 
+  font-weight:600;
+  margin-top:12px; 
+  background:var(--accent); 
+  color:white; 
+  width:100%;
+  cursor:pointer;
+  box-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px var(--accent), 0 0 30px var(--accent);
+}
+
+input {
+  padding: 12px 18px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #333;
+  font-size: 1rem;
+  margin-top: 10px;
+  background: #1a1a1a;
+  color: white;
+  box-sizing: border-box;
+}
+
+#meta { 
+  display:flex; 
+  justify-content:space-between; 
+  margin-bottom:8px; 
+  font-size:0.9rem; 
+}
+
+/* Scanning energy beam progress */
+#progress {
+  height:12px; 
+  background:#333; 
+  border-radius:8px; 
+  margin-bottom:16px; 
+  overflow:hidden;
+  position: relative;
+}
+#progress-bar { 
+  height:100%; 
+  width:0%; 
+  background: linear-gradient(90deg, var(--accent), #ff9900);
+  box-shadow: 0 0 10px var(--accent);
+  transition:width 0.3s; 
+}
+
+.question { font-size:1.1rem; margin:12px 0 20px; }
+.options { display:flex; flex-direction:column; gap:10px; }
+.option {
+  padding:12px; 
+  border-radius:8px; 
+  border:2px solid transparent; 
+  background:var(--accent);
+  text-align:left; 
+  font-weight:600; 
+  transition: background 0.2s, border 0.2s, transform 0.1s;
+  cursor:pointer;
+  color: black;
+}
+.option:hover {
+  transform: scale(1.02);
+}
+.option.correct { background:#1e4620; border-color:var(--correct); color: #fff; }
+.option.wrong { background:#4a1a1a; border-color:var(--wrong); color: #fff; }
+
+/* Mission complete stamp */
+#finalScore {
+  font-size: 1.2rem;
+  margin-top: 15px;
+  padding: 10px;
+  display: inline-block;
+  border: 3px solid var(--accent);
+  position: relative;
+  animation: stamp 0.6s ease-out forwards;
+}
+@keyframes stamp {
+  0% { transform: scale(3) rotate(-10deg); opacity: 0; }
+  100% { transform: scale(1) rotate(-5deg); opacity: 1; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- START SCREEN -->
+  <div id="start-screen" class="screen active">
+  <h1>Drosera Network Quiz</h1>
+  <input type="text" id="playerName" placeholder="Enter your callsign" required>
+  <button class="btn" id="startBtn" enabled>Initiate Mission</button>
+</div>
+
+  <!-- QUIZ SCREEN -->
+  <div id="quiz-screen" class="screen">
+    <div id="meta">
+      <span id="displayName"></span>
+      <span id="scoreDisplay">Score: 0</span>
+      <span id="timer">10:00</span>
+    </div>
+    <div id="progress"><div id="progress-bar"></div></div>
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div id="result-screen" class="screen">
+    <h1>Mission Complete</h1>
+    <p id="finalScore"></p>
+    <button class="btn" id="playAgainBtn">Restart Mission</button>
+  </div>
+</div>
+
+<script>
+const questions = [
+  // Section 1 — Drosera Vision
+  { q: "What does the phrase 'Orange is the New Stack' represent in Drosera’s context?", o: ["A metaphor for Drosera redefining Ethereum’s security architecture", "A branding effort about validator economics", "An industry campaign around EVM gas tokens", "None of the above"], a: 0 },
+  { q: "What is Drosera’s 'Trap architecture' designed to provide?", o: ["A fully onchain, trustless threat detection and response framework", "An audit replacement service managed by centralized firms", "A coordination layer for rollup sequencers", "All of the above"], a: 0 },
+
+  // Section 2 — On-Chain Security
+  { q: "When Drosera says its system is 'fully onchain,' what does this mean?", o: ["All detection and response logic executes in smart contracts", "Most logic runs offchain with periodic checkpoints", "It requires Operators to manually sign approvals", "All of the above"], a: 0 },
+  { q: "In Drosera’s architecture, what does 'trustless' imply?", o: ["No central authority must be relied on", "Validators alone guarantee responses", "Users must trust Drosera’s core team", "None of the above"], a: 0 },
+  { q: "What core problem is Drosera solving with Traps?", o: ["Realtime mitigation of exploits", "Lowering transaction fees on Ethereum", "Replacing proof of stake validators", "All of the above"], a: 0 },
+
+  // Section 3 — Ecosystem & Innovation
+  { q: "Which ecosystem is Drosera primarily building for?", o: ["Ethereum and Ethereum compatible chains", "Cosmos IBC networks", "Bitcoin Lightning channels", "None of the above"], a: 0 },
+  { q: "Why is Drosera’s Trap system called 'the first of its kind'?", o: ["It merges onchain automation with defense against social consensus capture", "It eliminates Solidity bugs entirely", "It launched before Ethereum’s mainnet", "All of the above"], a: 0 },
+  { q: "What threats can Drosera’s Trap architecture detect?", o: ["Re-entrancy and flash loan exploits", "Validator hardware overheating", "Delayed zk proof submissions", "All of the above"], a: 0 },
+
+  // Section 4 — Response & Role
+  { q: "What does 'response' mean in Drosera’s system?", o: ["Automated protective actions executed onchain", "Sending alerts for later manual review", "Validator slashing coordination", "None of the above"], a: 0 },
+  { q: "What role does Drosera play with respect to its Trap architecture?", o: ["It acts as Ethereum’s immune system distributing detection and response", "It centralizes audits under one authority", "It manages gas auctions for validators", "All of the above"], a: 0 },
+
+  // Section 5 — Why Drosera
+  { q: "What core challenge is Drosera solving?", o: ["Onchain detection and response to security threats", "Cross chain bridge liquidity", "ETH staking yield maximization", "None of the above"], a: 0 },
+  { q: "Why is Drosera called Ethereum’s Immune System?", o: ["Because Traps and Operators function like white blood cells", "Because it guarantees zero hacks ever again", "Because it replaces all governance votes", "All of the above"], a: 0 },
+
+  // Section 6 — Traps & Operators
+  { q: "What does 'fully onchain' mean in Drosera’s Trap system?", o: ["All Trap logic executes in smart contracts without offchain dependence", "Operators run it on private servers", "It relies on DAO Discord votes only", "All of the above"], a: 0 },
+  { q: "What does 'trustless' mean in Drosera’s design?", o: ["Security actions need no reliance on a central party", "Drosera’s core team always approves responses", "Validators alone determine all upgrades", "None of the above"], a: 0 },
+  { q: "What threats can Drosera’s Traps respond to?", o: ["Re-entrancy, flash loans, malicious exploits", "Governance bribery only", "Fake Twitter giveaways", "All of the above"], a: 0 },
+  { q: "How do Operators activate a Trap response?", o: ["By reaching consensus on detected threats", "By submitting memes in governance", "By staking NFTs to vote", "None of the above"], a: 0 },
+  { q: "What ensures Operators act honestly?", o: ["Slashing and reward incentives", "Voluntary disclosure rules only", "Community polls on Snapshot", "All of the above"], a: 0 },
+
+  // Section 7 — Incentives & Economics
+  { q: "Why would Operators run Traps?", o: ["To earn continuous onchain rewards", "To unlock discord roles", "To reduce validator hardware costs", "None of the above"], a: 0 },
+  { q: "What is the benefit of Bloom Boosts in Drosera?", o: ["They prioritize urgent responses with ETH deposits", "They guarantee higher validator yields", "They fund Drosera merchandise campaigns", "All of the above"], a: 0 },
+  { q: "What does Drosera’s incentive model create?", o: ["A decentralized marketplace for Ethereum security", "A centralized SaaS insurance company", "An NFT reward club", "All of the above"], a: 0 },
+
+  // Section 8 — Social Layer Risks
+  { q: "What problem does Drosera highlight for Ethereum’s future?", o: ["The social layer", "Block size limits", "Proof of stake validator count", "None of the above"], a: 0 },
+  { q: "Why is the social layer called a vector of attack?", o: ["Humans can be bribed, coerced, or socially engineered", "Consensus relies only on code execution", "Gas price spikes distort incentives", "All of the above"], a: 0 },
+  { q: "What happens if Ethereum’s social layer collapses?", o: ["Institutional adoption could vanish", "Contracts will auto repair themselves", "Validators simply spin up more nodes", "None of the above"], a: 0 },
+
+  // Section 9 — Threats & Consensus
+  { q: "How could nation states exploit Ethereum without social layer protection?", o: ["By manipulating developers and governance participants", "By launching high frequency MEV bots", "By bribing staking pools directly", "All of the above"], a: 0 },
+  { q: "What is the 'Trillion Dollar Question' institutions ask?", o: ["Can the social layer be captured, corrupted, or coerced?", "What is the current ETH staking APR?", "How much gas a rollup consumes", "None of the above"], a: 0 },
+  { q: "Why are social layer attacks more dangerous than contract exploits?", o: ["They target consensus and influence, not just code", "They can always be patched by Solidity upgrades", "They only affect NFTs", "All of the above"], a: 0 },
+
+  // Section 10 — Drosera as Immune System
+  { q: "How does Drosera act as Ethereum’s immune system?", o: ["By distributing detection and response across Operators", "By centralizing audits into one trusted provider", "By censoring invalid transactions directly", "None of the above"], a: 0 },
+  { q: "What role do Operators and Traps play?", o: ["Traps detect threats, Operators neutralize them", "Operators stake ETH to mint NFTs", "Traps host data for DAOs", "All of the above"], a: 0 },
+  { q: "How does Drosera prevent capture or coercion?", o: ["By distributing security decisions across many Operators", "By outsourcing audits to consulting firms", "By hiding validator addresses permanently", "All of the above"], a: 0 },
+
+  // Section 11 — Institutional Adoption
+  { q: "Why is protecting the social layer essential for Ethereum’s trillion dollar future?", o: ["It builds institutional confidence governance cannot be captured", "It guarantees ETH staking yields remain high", "It lowers gas costs for NFTs", "All of the above"], a: 0 }
+];
+
+// Shuffle
+function shuffleArray(array) {
+  return array
+    .map(value => ({ value, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ value }) => value);
+}
+const shuffledQuestions = shuffleArray(questions);
+
+let currentQuestion = 0;
+let score = 0;
+let playerName = "";
+
+const startScreen = document.getElementById("start-screen");
+const quizScreen = document.getElementById("quiz-screen");
+const resultScreen = document.getElementById("result-screen");
+const playerNameInput = document.getElementById("playerName");
+const displayName = document.getElementById("displayName");
+const scoreDisplay = document.getElementById("scoreDisplay");
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const finalScore = document.getElementById("finalScore");
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  if (playerNameInput.value.trim() === "") {
+    alert("Please enter your name to start.");
+    return;
+  }
+  playerName = playerNameInput.value.trim();
+  displayName.textContent = playerName;
+  score = 0;
+  currentQuestion = 0;
+  scoreDisplay.textContent = `Score: ${score}`;
+  showScreen("quiz-screen");
+  loadQuestion();
+});
+
+document.getElementById("playAgainBtn").addEventListener("click", () => {
+  showScreen("start-screen");
+});
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+function loadQuestion() {
+  let q = shuffledQuestions[currentQuestion];
+  questionEl.textContent = q.q;
+
+  const optionIndexes = q.o.map((opt, idx) => idx);
+  const shuffledIndexes = shuffleArray(optionIndexes);
+  const correctShuffledIndex = shuffledIndexes.indexOf(q.a);
+
+  optionsEl.innerHTML = "";
+  shuffledIndexes.forEach((originalIdx, displayIdx) => {
+    let btn = document.createElement("button");
+    btn.classList.add("option");
+    btn.textContent = q.o[originalIdx];
+    btn.addEventListener("click", () => selectOption(displayIdx, correctShuffledIndex));
+    optionsEl.appendChild(btn);
+  });
+
+  updateProgress();
+}
+
+function selectOption(selectedIndex, correctIndex) {
+  const optionButtons = document.querySelectorAll(".option");
+  optionButtons.forEach((btn, idx) => {
+    if (idx === correctIndex) btn.classList.add("correct");
+    else if (idx === selectedIndex) btn.classList.add("wrong");
+    btn.disabled = true;
+  });
+  if (selectedIndex === correctIndex) {
+    score++;
+    scoreDisplay.textContent = `Score: ${score}`;
+  }
+  setTimeout(nextQuestion, 900);
+}
+
+function nextQuestion() {
+  currentQuestion++;
+  if (currentQuestion < shuffledQuestions.length) {
+    loadQuestion();
+  } else {
+    finalScore.textContent = `${playerName}, you scored ${score} out of ${shuffledQuestions.length}!`;
+    showScreen("result-screen");
+  }
+}
+
+function updateProgress() {
+  let percent = ((currentQuestion) / shuffledQuestions.length) * 100;
+  progressBar.style.width = percent + "%";
+}
+</script>
+
+</body>
+</html>
